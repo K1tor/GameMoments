@@ -1,1 +1,1 @@
-{"actions":[{"type":"shot","name":"11-published.png"}]}
+{"actions":[{"type":"shot","name":"02-home.png"},{"type":"click","x":85,"y":173},{"type":"sleep","ms":1400},{"type":"shot","name":"03-library.png"},{"type":"click","x":73,"y":208},{"type":"sleep","ms":1400},{"type":"shot","name":"04-settings.png"}]}

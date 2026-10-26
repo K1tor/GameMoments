@@ -16,9 +16,9 @@ public sealed record DisplayInfo(int Index, string DeviceName, string FriendlyNa
     {
         get
         {
-            var name = string.IsNullOrWhiteSpace(FriendlyName) ? $"显示器 {Index + 1}" : FriendlyName;
-            var primary = IsPrimary ? "（主显示器）" : string.Empty;
-            return $"{name}{primary} · {SizeText}";
+            // 下拉框宽度有限：只显示“主显示器/显示器 N · 分辨率”，完整名称放在 ToolTip 里。
+            var name = IsPrimary ? "主显示器" : $"显示器 {Index + 1}";
+            return $"{name} · {SizeText}";
         }
     }
 }
