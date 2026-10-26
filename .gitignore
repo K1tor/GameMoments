@@ -1,0 +1,23 @@
+# 构建产物
+bin/
+obj/
+
+# 发布包与压缩包（体积大，可本地生成）
+dist/
+*.zip
+
+# 本地运行数据、测试数据与工具缓存
+.gmtest/
+.gmtest-*/
+.dotnet_home/
+.nuget/
+.tmp/
+
+# ffmpeg 二进制不入库；用 node tools/fetch-ffmpeg.mjs 获取
+tools/ffmpeg/*.exe
+tools/ffmpeg/*.gz
+
+# 编辑器
+.vs/
+*.user
+*.suo

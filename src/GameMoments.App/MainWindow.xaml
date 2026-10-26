@@ -1,0 +1,183 @@
+<Window x:Class="GameMoments.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:GameMoments.App.Converters"
+        mc:Ignorable="d"
+        Title="GameMoments 精彩时刻"
+        Height="830" Width="1280" MinHeight="700" MinWidth="1080"
+        Background="{StaticResource BgBrush}"
+        FontFamily="Microsoft YaHei UI"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <conv:StringNotEmptyToVisibilityConverter x:Key="NotEmptyToVis" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="238" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左侧导航 -->
+        <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="16,22,16,16">
+                <StackPanel DockPanel.Dock="Top">
+                    <StackPanel Orientation="Horizontal" Margin="4,0,0,24">
+                        <Border Width="38" Height="38" CornerRadius="10" Background="{StaticResource AccentBrush}">
+                            <TextBlock Text="GM" Foreground="White" FontWeight="Bold" FontSize="14"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="GameMoments" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="精彩时刻" FontSize="11" Foreground="{StaticResource MutedBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <RadioButton x:Name="NavHome" Style="{StaticResource NavButton}" GroupName="Nav"
+                                 Content="🏠   首页" Tag="home" IsChecked="True" Checked="Nav_Checked" />
+                    <RadioButton x:Name="NavLibrary" Style="{StaticResource NavButton}" GroupName="Nav"
+                                 Content="📚   片段库" Tag="library" Checked="Nav_Checked" />
+                    <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" GroupName="Nav"
+                                 Content="⚙   设置" Tag="settings" Checked="Nav_Checked" />
+                    <RadioButton x:Name="NavLogs" Style="{StaticResource NavButton}" GroupName="Nav"
+                                 Content="📄   日志与诊断" Tag="logs" Checked="Nav_Checked" />
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="当前状态" Style="{StaticResource Caption}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Ellipse Width="9" Height="9" Fill="{Binding StatusBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" Margin="8,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding CacheText}" Style="{StaticResource Caption}" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding VersionText}" Style="{StaticResource Caption}" Margin="4,0,0,2" />
+                    <TextBlock Text="本地录制 · 不上传" Style="{StaticResource Caption}" Margin="4,0,0,0" FontSize="11" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- 右侧内容 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="84" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="28,0,28,0">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="PageTitle" Text="首页" FontSize="22" FontWeight="Bold" />
+                    <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Caption}" Margin="0,6,0,0"
+                               TextTrimming="CharacterEllipsis" MaxWidth="620" HorizontalAlignment="Left" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1" CornerRadius="16" Padding="12,6" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding StateText}" FontSize="12" Margin="7,0,0,0" />
+                            <TextBlock Text="{Binding CacheText}" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                                       Margin="10,0,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Button Style="{StaticResource {x:Type Button}}" Click="SaveReplay_Click"
+                            IsEnabled="{Binding CanSave}" Padding="16,9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="●" Foreground="{StaticResource AccentBrush}" FontSize="11"
+                                       VerticalAlignment="Center" Margin="0,0,7,0" />
+                            <TextBlock Text="保存精彩时刻" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="5" Padding="6,1"
+                                    Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding HotkeySaveText}" FontSize="10.5"
+                                           Foreground="{StaticResource MutedBrush}" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <ContentControl x:Name="PageHost" Grid.Row="1" Margin="28,0,28,24" />
+        </Grid>
+
+        <!-- 首次运行引导 -->
+        <Border Grid.ColumnSpan="2" Background="#D9000000" Visibility="{Binding ShowFirstRun, Converter={StaticResource BoolToVis}}"
+                Panel.ZIndex="10">
+            <Border Style="{StaticResource Card}" Width="640" Padding="30" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="欢迎使用 GameMoments" FontSize="24" FontWeight="Bold" />
+                    <TextBlock Text="这是一个完全本地运行的即时回放录制工具：它持续保存最近一段时间的画面，按下快捷键即可留下刚才的精彩瞬间。"
+                               TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,22" />
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="34" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="26" Height="26" CornerRadius="13" Background="{StaticResource AccentSoftBrush}">
+                            <TextBlock Text="1" Foreground="#FF8A8E" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                            <TextBlock Text="先确认捕获与保存设置" FontWeight="SemiBold" />
+                            <TextBlock Text="默认使用主显示器、60 帧、硬件编码，保存到“视频\GameMoments”。" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="34" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="26" Height="26" CornerRadius="13" Background="{StaticResource AccentSoftBrush}">
+                            <TextBlock Text="2" Foreground="#FF8A8E" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                            <TextBlock Text="开始捕获，让缓存滚动起来" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap">
+                                <Run Text="缓存就绪后，按" />
+                                <Run Text="{Binding HotkeySaveText, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                                <Run Text="保存按键前一段画面；按" />
+                                <Run Text="{Binding HotkeyRecordText, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                                <Run Text="开始或停止一次完整录制。" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="34" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="26" Height="26" CornerRadius="13" Background="{StaticResource AccentSoftBrush}">
+                            <TextBlock Text="3" Foreground="#FF8A8E" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                            <TextBlock Text="在片段库中播放、打开或删除" FontWeight="SemiBold" />
+                            <TextBlock Text="所有片段只保存在本机；应用不会上传任何内容，也不会采集密码等隐私信息。"
+                                       Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="打开设置" Style="{StaticResource PrimaryButton}" Click="FirstRunSettings_Click" Padding="20,9" />
+                        <Button Content="开始使用" Style="{StaticResource GhostButton}" Click="FirstRunStart_Click" Margin="10,0,0,0" Padding="20,9" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- 底部提示 -->
+        <Border x:Name="Snackbar" Grid.ColumnSpan="2" Background="#F21C212C" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="10" Padding="16,10" Margin="0,0,0,26"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Panel.ZIndex="20" Visibility="Collapsed">
+            <TextBlock x:Name="SnackbarText" FontSize="13" />
+        </Border>
+    </Grid>
+</Window>

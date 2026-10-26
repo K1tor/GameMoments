@@ -1,0 +1,243 @@
+<UserControl x:Class="GameMoments.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:GameMoments.App.Converters">
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+        </Style>
+        <conv:StringNotEmptyToVisibilityConverter x:Key="NotEmptyToVis" />
+    </UserControl.Resources>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
+                Padding="0,14,0,0" Margin="0,14,0,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="SaveStatus" Text="" Foreground="{StaticResource GreenBrush}" FontSize="12.5" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="恢复默认设置" Style="{StaticResource GhostButton}"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Click="Reset_Click" />
+                    <Button Content="导出诊断包" Style="{StaticResource GhostButton}"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="8,0,0,0"
+                            Click="Diagnostics_Click" />
+                    <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Padding="22,9"
+                            Margin="8,0,0,0" Click="Save_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,4,0">
+
+                <!-- 捕获 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="捕获" Style="{StaticResource SectionTitle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="44" />
+                                <RowDefinition Height="44" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="捕获显示器" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="DisplayCombo" Grid.Column="1" ItemTemplate="{StaticResource DisplayItemTemplate}"
+                                      SelectionChanged="Display_Changed" Margin="0,0,24,0" />
+
+                            <TextBlock Text="帧率" Style="{StaticResource FieldLabel}" Grid.Column="2" />
+                            <ComboBox x:Name="FpsCombo" Grid.Column="3" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="Fps_Changed" />
+
+                            <TextBlock Text="捕获方式" Style="{StaticResource FieldLabel}" Grid.Row="1" />
+                            <ComboBox x:Name="SourceCombo" Grid.Row="1" Grid.Column="1" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="Source_Changed" Margin="0,0,24,0" />
+
+                            <TextBlock Text="编码器" Style="{StaticResource FieldLabel}" Grid.Row="1" Grid.Column="2" />
+                            <ComboBox x:Name="EncoderCombo" Grid.Row="1" Grid.Column="3" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="Encoder_Changed" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="桌面复制（DDA）优先走 GPU 零拷贝，适合全屏或无边框游戏；GDI 兼容性更好但开销更高。独占全屏、DRM 受保护内容、HDR 以及部分反作弊游戏可能无法捕获或显示黑屏——本工具不会绕过任何保护机制。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 即时回放 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="即时回放" Style="{StaticResource SectionTitle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="44" />
+                                <RowDefinition Height="44" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="回放缓存时长" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="ReplayCombo" Grid.Column="1" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="Replay_Changed" Margin="0,0,24,0" />
+
+                            <TextBlock Text="按键后继续录制" Style="{StaticResource FieldLabel}" Grid.Column="2" />
+                            <ComboBox x:Name="PostCombo" Grid.Column="3" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="Post_Changed" />
+
+                            <TextBlock Text="画质" Style="{StaticResource FieldLabel}" Grid.Row="1" />
+                            <ComboBox x:Name="QualityCombo" Grid.Row="1" Grid.Column="1" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="Quality_Changed" Margin="0,0,24,0" />
+
+                            <TextBlock Text="文件名前缀" Style="{StaticResource FieldLabel}" Grid.Row="1" Grid.Column="2" />
+                            <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding Settings.FileNamePrefix, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="缓存按每秒一个分片滚动写入，达到时长上限后自动删除最旧分片；保存时会锁定所需分片，不会清空未写完的数据。片段时长精度为 1 秒左右。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 音频 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="音频" Style="{StaticResource SectionTitle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="46" />
+                                <RowDefinition Height="46" />
+                                <RowDefinition Height="46" />
+                                <RowDefinition Height="46" />
+                            </Grid.RowDefinitions>
+
+                            <CheckBox Grid.Row="0" Content="录制系统声音" IsChecked="{Binding Settings.CaptureSystemAudio, Mode=TwoWay}"
+                                      VerticalAlignment="Center" />
+                            <ComboBox x:Name="SystemDeviceCombo" Grid.Row="0" Grid.Column="1" ItemTemplate="{StaticResource AudioDeviceItemTemplate}"
+                                      ItemsSource="{Binding SystemAudioDevices}" Margin="0,0,20,0"
+                                      SelectionChanged="SystemDevice_Changed" />
+
+                            <TextBlock Text="音量" Style="{StaticResource FieldLabel}" Grid.Row="1" />
+                            <Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="150" Width="260"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Value="{Binding Settings.SystemAudioVolume, Mode=TwoWay}" />
+                            <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource Caption}" VerticalAlignment="Center"
+                                       Text="{Binding Settings.SystemAudioVolume, StringFormat={}{0}%}" />
+
+                            <CheckBox Grid.Row="2" Content="录制麦克风" IsChecked="{Binding Settings.CaptureMicrophone, Mode=TwoWay}"
+                                      VerticalAlignment="Center" />
+                            <ComboBox x:Name="MicDeviceCombo" Grid.Row="2" Grid.Column="1" ItemTemplate="{StaticResource AudioDeviceItemTemplate}"
+                                      ItemsSource="{Binding MicrophoneDevices}" Margin="0,0,20,0"
+                                      SelectionChanged="MicDevice_Changed" />
+
+                            <TextBlock Text="音量" Style="{StaticResource FieldLabel}" Grid.Row="3" />
+                            <Slider Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="150" Width="260"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Value="{Binding Settings.MicrophoneVolume, Mode=TwoWay}" />
+                            <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource Caption}" VerticalAlignment="Center"
+                                       Text="{Binding Settings.MicrophoneVolume, StringFormat={}{0}%}" />
+                        </Grid>
+                        <TextBlock Text="{Binding AudioWarning}" Foreground="{StaticResource AmberBrush}" FontSize="12"
+                                   Margin="0,6,0,0" TextWrapping="Wrap" Visibility="{Binding AudioWarning, Converter={StaticResource NotEmptyToVis}}" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="系统声音通过回放端点环回采集；麦克风单独一路。设备缺失或占用时会在首页提示，不会假装已录制。拔插设备后请重新开始捕获。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 保存与行为 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="保存与行为" Style="{StaticResource SectionTitle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="保存目录" Style="{StaticResource FieldLabel}" />
+                            <TextBox x:Name="FolderBox" Grid.Column="1" Margin="0,0,10,0"
+                                     Text="{Binding Settings.SaveFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <Button Content="浏览…" Padding="12,7" Click="Browse_Click" />
+                                <Button Content="打开" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
+                                        Padding="12,7" Click="OpenSaveFolder_Click" />
+                            </StackPanel>
+                        </Grid>
+
+                        <WrapPanel Margin="0,16,0,0">
+                            <CheckBox Content="启动时自动开始捕获" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.AutoStartCapture, Mode=TwoWay}" />
+                            <CheckBox Content="最小化到托盘" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}" />
+                            <CheckBox Content="关闭窗口时隐藏到托盘" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.CloseToTray, Mode=TwoWay}" />
+                            <CheckBox Content="保存后打开片段库" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.OpenLibraryAfterSave, Mode=TwoWay}" />
+                            <CheckBox Content="显示托盘保存通知" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.ShowSaveNotifications, Mode=TwoWay}" />
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="关闭窗口时若启用“隐藏到托盘”，录制会继续运行；请从托盘菜单选择“退出”来真正停止并退出。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 快捷键 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="全局快捷键" Style="{StaticResource SectionTitle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="48" />
+                                <RowDefinition Height="48" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="保存精彩时刻" Style="{StaticResource FieldLabel}" />
+                            <TextBox x:Name="SaveKeyBox" Grid.Column="1" Width="260" HorizontalAlignment="Left"
+                                     IsReadOnly="True" Cursor="Hand" ToolTip="点击后按下新的组合键"
+                                     Text="{Binding HotkeySaveText, Mode=OneWay}"
+                                     PreviewKeyDown="SaveKey_PreviewKeyDown" GotKeyboardFocus="KeyBox_GotFocus" />
+
+                            <TextBlock Text="开始 / 停止录制" Style="{StaticResource FieldLabel}" Grid.Row="1" />
+                            <TextBox x:Name="RecordKeyBox" Grid.Row="1" Grid.Column="1" Width="260" HorizontalAlignment="Left"
+                                     IsReadOnly="True" Cursor="Hand" ToolTip="点击后按下新的组合键"
+                                     Text="{Binding HotkeyRecordText, Mode=OneWay}"
+                                     PreviewKeyDown="RecordKey_PreviewKeyDown" GotKeyboardFocus="KeyBox_GotFocus" />
+                        </Grid>
+                        <TextBlock Text="{Binding HotkeyErrorText}" Foreground="{StaticResource AmberBrush}" FontSize="12"
+                                   Margin="0,8,0,0" TextWrapping="Wrap" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="快捷键必须包含至少一个修饰键（Ctrl / Alt / Shift / Win）。若组合已被其他程序占用，会在首页和此处提示，可按自己的需要修改。" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Style="{StaticResource Caption}" Margin="2,0,0,6">
+                    <Run Text="数据目录：" />
+                    <Run Text="{Binding DataFolderText, Mode=OneWay}" />
+                </TextBlock>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
+
+
+
+

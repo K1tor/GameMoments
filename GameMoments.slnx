@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/GameMoments.App/GameMoments.App.csproj" />
+  <Project Path="src/GameMoments.Cli/GameMoments.Cli.csproj" />
+  <Project Path="src/GameMoments.Core/GameMoments.Core.csproj" />
+  <Project Path="tests/GameMoments.Tests/GameMoments.Tests.csproj" />
+</Solution>
