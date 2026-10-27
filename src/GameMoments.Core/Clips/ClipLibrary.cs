@@ -157,6 +157,9 @@ public sealed class ClipLibrary
             AudioSummary = clip.AudioSummary,
             ThumbnailPath = clip.ThumbnailPath,
             ManualRecording = clip.ManualRecording,
+            GameName = clip.GameName,
+            EventKind = clip.EventKind,
+            EventSource = clip.EventSource,
         };
 
         lock (_gate)

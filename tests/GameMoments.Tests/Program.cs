@@ -24,7 +24,7 @@ internal static class Program
     }
 }
 
-internal sealed class TestSuite
+internal sealed partial class TestSuite
 {
     private int _passed;
     private int _failed;
@@ -48,6 +48,10 @@ internal sealed class TestSuite
         SegmentRingTests();
         ClipIndexTests();
         FfmpegCommandTests();
+        SmartSettingsTests();
+        GsiAdapterTests();
+        EventRuleTests();
+        GsiConfigTests();
         MiscTests();
 
         Console.WriteLine($"通过 {_passed}，失败 {_failed}");

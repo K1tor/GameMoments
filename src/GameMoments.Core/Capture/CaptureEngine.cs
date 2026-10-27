@@ -409,7 +409,7 @@ public sealed class CaptureEngine : IAsyncDisposable
         return (true, null);
     }
 
-    public async Task<SaveOutcome> StopManualRecordingAsync(string? title = null)
+    public async Task<SaveOutcome> StopManualRecordingAsync(string? title = null, GameMoments.Core.Gaming.GameClipTag? tag = null)
     {
         if (!IsManualRecording || _manualStartUtc is null)
         {
@@ -421,11 +421,11 @@ public sealed class CaptureEngine : IAsyncDisposable
         if (_ring is not null) _ring.RetainAll = false;
         State = CaptureState.Replaying;
 
-        var outcome = await SaveCoreAsync(start, DateTime.UtcNow, 0, manual: true, title);
+        var outcome = await SaveCoreAsync(start, DateTime.UtcNow, 0, manual: true, title, tag);
         return outcome;
     }
 
-    public async Task<SaveOutcome> SaveReplayAsync(string? title = null)
+    public async Task<SaveOutcome> SaveReplayAsync(string? title = null, GameMoments.Core.Gaming.GameClipTag? tag = null)
     {
         if (State == CaptureState.Recording)
         {
@@ -438,10 +438,42 @@ public sealed class CaptureEngine : IAsyncDisposable
 
         var replay = Math.Max(5, _settings.ReplaySeconds);
         var trigger = DateTime.UtcNow;
-        return await SaveCoreAsync(trigger.AddSeconds(-replay), trigger, Math.Max(0, _settings.PostTriggerSeconds), manual: false, title);
+        return await SaveCoreAsync(trigger.AddSeconds(-replay), trigger, Math.Max(0, _settings.PostTriggerSeconds), manual: false, title, tag);
     }
 
-    private async Task<SaveOutcome> SaveCoreAsync(DateTime requestedStartUtc, DateTime triggerUtc, int postSeconds, bool manual, string? title)
+    /// <summary>
+    /// 按事件时间点保存片段：保留事件前 <paramref name="preSeconds"/> 秒、事件后继续录制
+    /// <paramref name="postSeconds"/> 秒再裁剪。供智能录制的事件规则使用。
+    /// </summary>
+    public async Task<SaveOutcome> SaveEventClipAsync(
+        DateTime eventUtc,
+        int preSeconds,
+        int postSeconds,
+        string? title,
+        GameMoments.Core.Gaming.GameClipTag? tag,
+        bool allowDuringRecording = false)
+    {
+        if (State is not (CaptureState.Replaying or CaptureState.Recording))
+        {
+            return SaveOutcome.Fail("捕获尚未就绪，暂时不能保存事件片段。");
+        }
+        if (State == CaptureState.Recording && !allowDuringRecording)
+        {
+            return SaveOutcome.Fail("正在完整录制中，无法单独保存事件片段。");
+        }
+
+        var pre = Math.Clamp(preSeconds, 3, 300);
+        var post = Math.Clamp(postSeconds, 0, 60);
+        return await SaveCoreAsync(eventUtc.AddSeconds(-pre), eventUtc, post, manual: false, title, tag);
+    }
+
+    private async Task<SaveOutcome> SaveCoreAsync(
+        DateTime requestedStartUtc,
+        DateTime triggerUtc,
+        int postSeconds,
+        bool manual,
+        string? title,
+        GameMoments.Core.Gaming.GameClipTag? tag = null)
     {
         if (Interlocked.Increment(ref _pendingSaves) > Math.Max(1, _settings.MaxQueuedSaves))
         {
@@ -512,7 +544,7 @@ public sealed class CaptureEngine : IAsyncDisposable
 
             try
             {
-                var request = new AssemblyRequest(segments, clipStart, clipDuration, audioSources, manual, title);
+                var request = new AssemblyRequest(segments, clipStart, clipDuration, audioSources, manual, title, tag);
                 var clip = await _assembler.AssembleAsync(request, _settings, Profile ?? new CaptureProfile(CaptureSource.Gdigrab, "libx264", _settings.Fps));
                 _library.Add(clip);
                 LastSavedPath = clip.FilePath;

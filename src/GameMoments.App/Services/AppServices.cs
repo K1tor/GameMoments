@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using GameMoments.Core.Capture;
 using GameMoments.Core.Clips;
 using GameMoments.Core.Configuration;
+using GameMoments.Core.Gaming;
 using GameMoments.Core.Logging;
 using GameMoments.Core.Media;
 using GameMoments.Core.Platform;
@@ -23,11 +24,12 @@ public sealed class AppServices
     public FfmpegTools? Tools { get; private set; }
     public FfmpegCapabilities? Capabilities { get; private set; }
     public CaptureEngine? Engine { get; private set; }
+    public SmartRecordingService? Smart { get; private set; }
     public string? SetupError { get; private set; }
     public string? AudioError { get; internal set; }
 
     public string Version =>
-        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.1.0";
+        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.2.0";
 
     public void Initialize()
     {
@@ -85,11 +87,20 @@ public sealed class AppServices
         if (Tools is null || Capabilities is null)
         {
             Logger.Error("FFmpeg", "未找到可用的 ffmpeg，捕获功能不可用", null, SetupError);
+            EnsureSmartService();
             return;
         }
 
         Assembler = new ClipAssembler(Tools, Paths, Logger);
         Engine = new CaptureEngine(Paths, Logger, Tools, Capabilities);
+        Smart = new SmartRecordingService(Logger, Paths, Library, () => Settings, () => Engine, () => Assembler);
+    }
+
+    /// <summary>在 ffmpeg 不可用时也要能创建智能录制服务（仅检测进程、事件源不可保存）。</summary>
+    public void EnsureSmartService()
+    {
+        if (Smart is not null) return;
+        Smart = new SmartRecordingService(Logger, Paths, Library, () => Settings, () => Engine, () => Assembler);
     }
 
     public void SaveSettings()
@@ -100,6 +111,18 @@ public sealed class AppServices
 
     public async Task ShutdownAsync()
     {
+        try
+        {
+            if (Smart is not null)
+            {
+                await Smart.StopAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("应用", "退出时停止智能录制失败", ex);
+        }
+
         try
         {
             if (Engine is not null)

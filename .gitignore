@@ -21,3 +21,6 @@ tools/ffmpeg/*.gz
 .vs/
 *.user
 *.suo
+
+# 本地冒烟/截图中间产物
+scratch/

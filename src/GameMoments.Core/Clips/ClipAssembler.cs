@@ -22,7 +22,8 @@ public sealed record AssemblyRequest(
     double DurationSeconds,
     IReadOnlyList<AudioMixSource> Audio,
     bool ManualRecording,
-    string? Title);
+    string? Title,
+    GameMoments.Core.Gaming.GameClipTag? Tag = null);
 
 /// <summary>
 /// 把已关闭的 1 秒视频分段拼成完整 MP4，裁剪并混合对应时间段的音频，
@@ -177,6 +178,9 @@ public sealed class ClipAssembler
                 AudioSummary = BuildAudioSummary(request.Audio),
                 ThumbnailPath = thumbnailPath,
                 ManualRecording = request.ManualRecording,
+                GameName = request.Tag?.GameName,
+                EventKind = request.Tag?.EventKind,
+                EventSource = request.Tag?.EventSource,
             };
 
             _logger.Info("组装", $"片段已生成：{record.FileName}",

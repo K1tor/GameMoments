@@ -54,6 +54,22 @@ public partial class SettingsView : UserControl
         new("software", "仅软件编码（x264）")
     ];
 
+    private static readonly OptionItem[] WholeMinutesOptions =
+    [
+        new(0, "不限（手动停止）"), new(20, "20 分钟"), new(30, "30 分钟"),
+        new(45, "45 分钟"), new(60, "60 分钟"), new(90, "90 分钟"), new(120, "120 分钟")
+    ];
+
+    private static readonly OptionItem[] StopDelayOptions =
+    [
+        new(0, "立即停止"), new(3, "3 秒"), new(5, "5 秒"), new(10, "10 秒")
+    ];
+
+    private static readonly OptionItem[] EventHistoryOptions =
+    [
+        new(20, "20 条"), new(50, "50 条"), new(100, "100 条"), new(200, "200 条")
+    ];
+
     private readonly DispatcherTimer _statusTimer;
     private bool _loading;
 
@@ -67,6 +83,9 @@ public partial class SettingsView : UserControl
         QualityCombo.ItemsSource = QualityOptions;
         SourceCombo.ItemsSource = SourceOptions;
         EncoderCombo.ItemsSource = EncoderOptions;
+        WholeMinutesCombo.ItemsSource = WholeMinutesOptions;
+        StopDelayCombo.ItemsSource = StopDelayOptions;
+        HistoryCombo.ItemsSource = EventHistoryOptions;
 
         _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         _statusTimer.Tick += (_, _) =>
@@ -102,6 +121,13 @@ public partial class SettingsView : UserControl
 
             SystemDeviceCombo.SelectedItem = FindDevice(Vm.SystemAudioDevices, Vm.Settings.SystemAudioDeviceId);
             MicDeviceCombo.SelectedItem = FindDevice(Vm.MicrophoneDevices, Vm.Settings.MicrophoneDeviceId);
+
+            WholeMinutesCombo.SelectedItem = WholeMinutesOptions.FirstOrDefault(o => (int)o.Value == Vm.Settings.WholeRecordingMinutes)
+                                            ?? WholeMinutesOptions[0];
+            StopDelayCombo.SelectedItem = StopDelayOptions.FirstOrDefault(o => (int)o.Value == Vm.Settings.WholeRecordingStopDelaySeconds)
+                                          ?? StopDelayOptions[2];
+            HistoryCombo.SelectedItem = EventHistoryOptions.FirstOrDefault(o => (int)o.Value == Vm.Settings.MaxEventHistory)
+                                        ?? EventHistoryOptions[1];
         }
         finally
         {
@@ -253,7 +279,27 @@ public partial class SettingsView : UserControl
 
     private void RecordKey_PreviewKeyDown(object sender, KeyEventArgs e) => CaptureHotkey(e, false);
 
-    private void CaptureHotkey(KeyEventArgs e, bool saveHotkey)
+    private void BookmarkKey_PreviewKeyDown(object sender, KeyEventArgs e) => CaptureHotkey(e, null);
+
+    private void WholeMinutes_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || WholeMinutesCombo.SelectedItem is not OptionItem item) return;
+        Vm.Settings.WholeRecordingMinutes = (int)item.Value;
+    }
+
+    private void StopDelay_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || StopDelayCombo.SelectedItem is not OptionItem item) return;
+        Vm.Settings.WholeRecordingStopDelaySeconds = (int)item.Value;
+    }
+
+    private void History_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || HistoryCombo.SelectedItem is not OptionItem item) return;
+        Vm.Settings.MaxEventHistory = (int)item.Value;
+    }
+
+    private void CaptureHotkey(KeyEventArgs e, bool? saveHotkey)
     {
         e.Handled = true;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
@@ -292,13 +338,30 @@ public partial class SettingsView : UserControl
             return;
         }
 
-        if (!Vm.SetHotkey(saveHotkey, gesture, out var error))
+        var slot = saveHotkey switch
+        {
+            true => HotkeySlot.Save,
+            false => HotkeySlot.Record,
+            null => HotkeySlot.Bookmark
+        };
+
+        if (!Vm.SetHotkey(slot, gesture, out var error))
         {
             MessageBox.Show(error ?? "快捷键设置失败。", "快捷键", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        Vm.RaiseStaticProperties();
-        SaveStatus.Text = "快捷键已更新，点击“保存设置”写入磁盘";
+        if (saveHotkey == true)
+        {
+            SaveStatus.Text = "保存快捷键已更新，点击“保存设置”写入磁盘";
+        }
+        else if (saveHotkey == false)
+        {
+            SaveStatus.Text = "录制快捷键已更新，点击“保存设置”写入磁盘";
+        }
+        else
+        {
+            SaveStatus.Text = "书签快捷键已更新，点击“保存设置”写入磁盘";
+        }
     }
 }

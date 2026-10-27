@@ -196,6 +196,59 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 智能录制 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="智能录制与游戏事件源" Style="{StaticResource SectionTitle}" />
+                        <WrapPanel Margin="0,10,0,0">
+                            <CheckBox Content="启用智能录制（游戏自动检测 + 事件自动剪辑）" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.SmartRecordingEnabled, Mode=TwoWay}" />
+                            <CheckBox Content="自动安装 / 更新 CS2 的 GSI 配置" Margin="0,6,28,6"
+                                      IsChecked="{Binding Settings.InstallGsiConfig, Mode=TwoWay}" />
+                        </WrapPanel>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="28" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="事件源端口" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Width="110" VerticalAlignment="Center"
+                                     Text="{Binding Settings.SmartGsiPort, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            <TextBlock Grid.Column="3" Text="单局最长录制" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="WholeMinutesCombo" Grid.Column="4" Width="150" SelectedValuePath="Value"
+                                      DisplayMemberPath="Text" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="WholeMinutes_Changed" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="28" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="退出游戏后延时停止" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="StopDelayCombo" Grid.Column="1" Width="110" SelectedValuePath="Value"
+                                      DisplayMemberPath="Text" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="StopDelay_Changed" />
+                            <TextBlock Grid.Column="3" Text="事件记录上限" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="HistoryCombo" Grid.Column="4" Width="150" SelectedValuePath="Value"
+                                      DisplayMemberPath="Text" ItemTemplate="{StaticResource OptionItemTemplate}"
+                                      SelectionChanged="History_Changed" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" TextWrapping="Wrap"
+                                   Text="端口用于接收游戏推送的状态数据（仅监听本机 127.0.0.1）。CS2 的单个片段事件前保留时长、冷却、合并窗口与各事件开关在「智能录制」页面按游戏单独设置。修改端口保存后会自动重写 GSI 配置。" />
+                        <TextBlock Text="{Binding SmartErrorText}" Foreground="{StaticResource AmberBrush}" FontSize="12"
+                                   Margin="0,8,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <!-- 快捷键 -->
                 <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                     <StackPanel>
@@ -206,6 +259,7 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="48" />
                                 <RowDefinition Height="48" />
                                 <RowDefinition Height="48" />
                             </Grid.RowDefinitions>
@@ -221,6 +275,12 @@
                                      IsReadOnly="True" Cursor="Hand" ToolTip="点击后按下新的组合键"
                                      Text="{Binding HotkeyRecordText, Mode=OneWay}"
                                      PreviewKeyDown="RecordKey_PreviewKeyDown" GotKeyboardFocus="KeyBox_GotFocus" />
+
+                            <TextBlock Text="立即保存书签" Style="{StaticResource FieldLabel}" Grid.Row="2" />
+                            <TextBox x:Name="BookmarkKeyBox" Grid.Row="2" Grid.Column="1" Width="260" HorizontalAlignment="Left"
+                                     IsReadOnly="True" Cursor="Hand" ToolTip="点击后按下新的组合键"
+                                     Text="{Binding BookmarkHotkeyText, Mode=OneWay}"
+                                     PreviewKeyDown="BookmarkKey_PreviewKeyDown" GotKeyboardFocus="KeyBox_GotFocus" />
                         </Grid>
                         <TextBlock Text="{Binding HotkeyErrorText}" Foreground="{StaticResource AmberBrush}" FontSize="12"
                                    Margin="0,8,0,0" TextWrapping="Wrap" />

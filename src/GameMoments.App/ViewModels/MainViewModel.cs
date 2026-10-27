@@ -12,6 +12,7 @@ using GameMoments.Core.Audio;
 using GameMoments.Core.Capture;
 using GameMoments.Core.Clips;
 using GameMoments.Core.Configuration;
+using GameMoments.Core.Gaming;
 using GameMoments.Core.Hotkeys;
 using GameMoments.Core.Logging;
 using GameMoments.Core.Platform;
@@ -54,6 +55,16 @@ public sealed class MainViewModel : ObservableObject
     private bool _showFirstRun;
     private bool _showSetupBanner;
     private SolidColorBrush _statusBrush = new(Color.FromRgb(0x98, 0xA2, 0xB3));
+    private string _smartStatusText = "智能录制未启用";
+    private string _smartDetectionText = "未检测到游戏";
+    private string _smartGsiText = "事件源未启动";
+    private string _smartErrorText = string.Empty;
+    private string _currentGameText = "当前没有检测到游戏";
+    private string _wholeRecordingText = "整局录制未开始";
+    private string _cs2ConfigText = "GSI 配置未检测";
+    private string _eventCountText = "还没有事件";
+    private bool _smartRunning;
+    private bool _isWholeRecording;
 
     public MainViewModel(AppServices services, Dispatcher dispatcher)
     {
@@ -66,6 +77,9 @@ public sealed class MainViewModel : ObservableObject
         Clips = new ObservableCollection<ClipRecord>();
         RecentClips = new ObservableCollection<ClipRecord>();
         Logs = new ObservableCollection<LogEntry>();
+        DetectedGames = new ObservableCollection<DetectedGame>();
+        RecentEvents = new ObservableCollection<SmartEventRecord>();
+        GameCards = new ObservableCollection<GameCardViewModel>();
 
         ShowFirstRun = !services.Settings.FirstRunCompleted;
 
@@ -82,6 +96,7 @@ public sealed class MainViewModel : ObservableObject
 
         RefreshClips();
         RefreshDevices();
+        RebuildGameCards();
         UpdateFromEngine();
     }
 
@@ -104,6 +119,29 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ClipRecord> Clips { get; }
     public ObservableCollection<ClipRecord> RecentClips { get; }
     public ObservableCollection<LogEntry> Logs { get; }
+    public ObservableCollection<DetectedGame> DetectedGames { get; }
+    public ObservableCollection<SmartEventRecord> RecentEvents { get; }
+    public ObservableCollection<GameCardViewModel> GameCards { get; }
+
+    public SmartRecordingService? Smart => _services.Smart;
+    public bool HasSmart => _services.Smart is not null;
+    public bool SmartRunning { get => _smartRunning; private set => SetProperty(ref _smartRunning, value); }
+    public bool IsWholeRecording { get => _isWholeRecording; private set => SetProperty(ref _isWholeRecording, value); }
+    public string SmartStatusText { get => _smartStatusText; private set => SetProperty(ref _smartStatusText, value); }
+    public string SmartDetectionText { get => _smartDetectionText; private set => SetProperty(ref _smartDetectionText, value); }
+    public string SmartGsiText { get => _smartGsiText; private set => SetProperty(ref _smartGsiText, value); }
+    public string SmartErrorText { get => _smartErrorText; private set => SetProperty(ref _smartErrorText, value); }
+    public string CurrentGameText { get => _currentGameText; private set => SetProperty(ref _currentGameText, value); }
+    public string WholeRecordingText { get => _wholeRecordingText; private set => SetProperty(ref _wholeRecordingText, value); }
+    public string WholeEstimateText => _services.Smart?.WholeRecordingEstimateText ?? "整局录制：按设定时长估算占用";
+    public string Cs2ConfigText { get => _cs2ConfigText; private set => SetProperty(ref _cs2ConfigText, value); }
+    public string EventCountText { get => _eventCountText; private set => SetProperty(ref _eventCountText, value); }
+    public string SmartToggleText => Settings.SmartRecordingEnabled ? "关闭智能录制" : "开启智能录制";
+    public string BookmarkHotkeyText => Settings.BookmarkHotkey;
+    public bool CanStopWhole => IsWholeRecording;
+
+    /// <summary>每款游戏的设置（界面按游戏卡片显示）。</summary>
+    public IReadOnlyList<GameDefinition> Games => GameCatalog.BuiltIn;
 
     public string VersionText => $"v{_services.Version}";
     public string SaveFolderText => _services.Settings.SaveFolder;
@@ -182,7 +220,19 @@ public sealed class MainViewModel : ObservableObject
             RefreshDevices();
             UpdateFromEngine();
 
-            if (_services.Engine is not null && _services.Settings.AutoStartCapture)
+            _services.EnsureSmartService();
+            AttachSmart();
+
+            if (_services.Smart is not null && Settings.SmartRecordingEnabled)
+            {
+                var (ok, error) = await _services.Smart.StartAsync();
+                if (!ok) SmartErrorText = error ?? string.Empty;
+            }
+
+            UpdateSmartFromService();
+            RefreshEvents();
+
+            if (_services.Engine is not null && _services.Settings.AutoStartCapture && !_services.Engine.IsRunning)
             {
                 await StartCaptureAsync();
             }
@@ -412,6 +462,348 @@ public sealed class MainViewModel : ObservableObject
         ClipSaved?.Invoke(clip);
     }
 
+    // ---- 智能录制 ----
+
+    private void AttachSmart()
+    {
+        var smart = _services.Smart;
+        if (smart is null) return;
+
+        smart.Changed += OnSmartChanged;
+        smart.EventRecorded += OnSmartEventRecorded;
+        smart.EventRecordUpdated += OnSmartEventUpdated;
+        smart.Notice += OnSmartNotice;
+    }
+
+    private void DetachSmart()
+    {
+        var smart = _services.Smart;
+        if (smart is null) return;
+
+        smart.Changed -= OnSmartChanged;
+        smart.EventRecorded -= OnSmartEventRecorded;
+        smart.EventRecordUpdated -= OnSmartEventUpdated;
+        smart.Notice -= OnSmartNotice;
+    }
+
+    private void OnSmartChanged()
+    {
+        if (_dispatcher.CheckAccess()) UpdateSmartFromService();
+        else _dispatcher.BeginInvoke(UpdateSmartFromService);
+    }
+
+    private void OnSmartEventRecorded(SmartEventRecord record)
+    {
+        _dispatcher.BeginInvoke(() =>
+        {
+            RecentEvents.Insert(0, record);
+            while (RecentEvents.Count > Math.Max(10, Settings.MaxEventHistory)) RecentEvents.RemoveAt(RecentEvents.Count - 1);
+            UpdateEventCount();
+        });
+    }
+
+    private void OnSmartEventUpdated(SmartEventRecord record)
+    {
+        _dispatcher.BeginInvoke(() =>
+        {
+            var index = RecentEvents.IndexOf(record);
+            if (index >= 0)
+            {
+                // 触发整行重绘（记录本身是可变的）。
+                RecentEvents.RemoveAt(index);
+                RecentEvents.Insert(index, record);
+            }
+
+            OnPropertyChanged(nameof(EventCountText));
+        });
+    }
+
+    private void OnSmartNotice(string message)
+    {
+        _dispatcher.BeginInvoke(() =>
+        {
+            StatusMessage = message;
+            Notice?.Invoke(message);
+        });
+    }
+
+    public void UpdateSmartFromService()
+    {
+        var smart = _services.Smart;
+        if (smart is null)
+        {
+            SmartRunning = false;
+            SmartStatusText = "智能录制不可用";
+            return;
+        }
+
+        SmartRunning = smart.IsRunning;
+        IsWholeRecording = smart.IsWholeRecording;
+        OnPropertyChanged(nameof(CanStopWhole));
+        SmartStatusText = smart.IsRunning
+            ? (Settings.SmartRecordingEnabled ? "智能录制已开启" : "智能录制已开启（总开关已关闭，等待停止）")
+            : "智能录制未运行";
+        SmartDetectionText = smart.DetectionText;
+        SmartGsiText = $"事件源 {smart.GsiEndpointText} · 已接收 {smart.Cs2.PayloadCount} 条状态推送";
+        SmartErrorText = smart.LastError ?? string.Empty;
+
+        var current = smart.CurrentGame;
+        CurrentGameText = current is null
+            ? "当前没有检测到游戏"
+            : $"{current.DisplayName} · {current.ProcessDisplay} · {(current.IsForeground ? "前台运行中" : "后台运行中")} · {current.SupportText}";
+
+        WholeRecordingText = smart.IsWholeRecording
+            ? $"整局录制中：{smart.WholeRecordingGameName}"
+            : "整局录制未开始";
+        OnPropertyChanged(nameof(WholeEstimateText));
+        Cs2ConfigText = DescribeCs2Config(smart);
+
+        DetectedGames.Clear();
+        foreach (var game in smart.DetectedGames) DetectedGames.Add(game);
+    }
+
+    private string DescribeCs2Config(SmartRecordingService smart)
+    {
+        var status = smart.Cs2ConfigStatus;
+        if (status is null) return "GSI 配置未检测";
+        if (!status.Exists) return "CS2 的 GSI 配置尚未安装";
+        if (!status.OwnedByGameMoments) return "CS2 的同名配置已存在（不是本程序写入的，已保留）";
+        return $"CS2 的 GSI 配置已安装（端口 {status.ConfiguredPort}）";
+    }
+
+    /// <summary>按游戏目录 + 自定义进程重建智能录制页的卡片。</summary>
+    public void RebuildGameCards()
+    {
+        GameCards.Clear();
+        var definitions = new List<GameDefinition>(GameCatalog.BuiltIn);
+        foreach (var entry in Settings.CustomGameExecutables)
+        {
+            var parsed = GameCatalog.ParseCustomEntry(entry);
+            if (parsed is null) continue;
+            var definition = GameCatalog.CustomDefinition(parsed.Value.Executable, parsed.Value.DisplayName);
+            if (definitions.Any(d => string.Equals(d.Id, definition.Id, StringComparison.OrdinalIgnoreCase))) continue;
+            definitions.Add(definition);
+        }
+
+        foreach (var definition in definitions)
+        {
+            var config = Settings.GetGameConfig(definition.Id);
+            config.EnsureEventKinds(GameEventKinds.UserConfigurable);
+            GameCards.Add(new GameCardViewModel(definition, config, () => SaveSettingsAsync()));
+        }
+    }
+
+    public string CustomGameExecutablesText =>
+        Settings.CustomGameExecutables.Count == 0 ? "还没有自定义游戏" : string.Join("、", Settings.CustomGameExecutables);
+
+    public void RefreshEvents()
+    {
+        RecentEvents.Clear();
+        var smart = _services.Smart;
+        if (smart is not null)
+        {
+            foreach (var record in smart.Events.History.Take(Math.Max(10, Settings.MaxEventHistory)))
+            {
+                RecentEvents.Add(record);
+            }
+        }
+
+        UpdateEventCount();
+    }
+
+    private void UpdateEventCount()
+    {
+        var smart = _services.Smart;
+        if (smart is null || RecentEvents.Count == 0)
+        {
+            EventCountText = "还没有事件";
+            return;
+        }
+
+        var saved = RecentEvents.Count(r => r.IsSaved);
+        var bookmarked = RecentEvents.Count(r => r.CanSaveFromCache);
+        EventCountText = $"共 {RecentEvents.Count} 条事件 · 已保存 {saved} · 书签 {bookmarked} · 已忽略 {smart.Events.SuppressedCount}";
+    }
+
+    public async Task ToggleSmartAsync()
+    {
+        _services.EnsureSmartService();
+        var smart = _services.Smart;
+        if (smart is null) return;
+
+        if (Settings.SmartRecordingEnabled)
+        {
+            Settings.SmartRecordingEnabled = false;
+            await smart.StopAsync();
+            _services.SaveSettings();
+        }
+        else
+        {
+            Settings.SmartRecordingEnabled = true;
+            _services.SaveSettings();
+            var (ok, error) = await smart.StartAsync();
+            if (!ok)
+            {
+                SmartErrorText = error ?? string.Empty;
+                Notice?.Invoke("开启智能录制失败：" + error);
+            }
+        }
+
+        OnPropertyChanged(nameof(SmartToggleText));
+        UpdateSmartFromService();
+    }
+
+    public async Task RefreshSmartAsync()
+    {
+        var smart = _services.Smart;
+        if (smart is null) return;
+        await smart.SyncAsync();
+        UpdateSmartFromService();
+        RefreshEvents();
+    }
+
+    public async Task<string> RepairEventSourceAsync()
+    {
+        var smart = _services.Smart;
+        if (smart is null) return "智能录制不可用。";
+        var (ok, message) = await smart.RepairEventSourceAsync();
+        UpdateSmartFromService();
+        return ok ? message : "修复失败：" + message;
+    }
+
+    public async Task StopWholeRecordingAsync()
+    {
+        var smart = _services.Smart;
+        if (smart is null) return;
+        var (ok, message) = await smart.StopWholeRecordingNowAsync();
+        Notice?.Invoke(message);
+        UpdateSmartFromService();
+        UpdateFromEngine();
+        RefreshClips();
+        _ = ok;
+    }
+
+    public async Task SaveEventFromCacheAsync(SmartEventRecord record)
+    {
+        var smart = _services.Smart;
+        if (smart is null) return;
+        var (ok, message) = await smart.SaveRecordFromCacheAsync(record);
+        if (ok)
+        {
+            Notice?.Invoke("已保存事件片段：" + message);
+            RefreshClips();
+        }
+        else
+        {
+            Notice?.Invoke("补存失败：" + message);
+        }
+
+        OnPropertyChanged(nameof(EventCountText));
+    }
+
+    public void MarkFalsePositive(SmartEventRecord record, bool value)
+    {
+        _services.Smart?.Events.SetFalsePositive(record, value);
+        OnPropertyChanged(nameof(EventCountText));
+    }
+
+    public void ClearEvents()
+    {
+        _services.Smart?.Events.ClearHistory();
+        RefreshEvents();
+        _ = RefreshSmartAsync();
+    }
+
+    public string UninstallGsiConfig()
+    {
+        var definition = GameCatalog.Find(GameCatalog.Cs2GameId);
+        if (definition is null) return "找不到游戏定义。";
+        var installer = new GsiConfigInstaller(_services.Logger);
+        var result = installer.Remove(definition);
+        _ = RefreshSmartAsync();
+        return result.Message;
+    }
+
+    public string GsiConfigPathText
+    {
+        get
+        {
+            var definition = GameCatalog.Find(GameCatalog.Cs2GameId);
+            return definition is null ? string.Empty : (GsiConfigInstaller.ResolveConfigPath(definition) ?? "（未找到游戏目录）");
+        }
+    }
+
+    public void ToggleGameEnabled(string gameId)
+    {
+        var config = Settings.GetGameConfig(gameId);
+        config.Enabled = !config.Enabled;
+        _services.SaveSettings();
+        OnPropertyChanged(nameof(Settings));
+        Notice?.Invoke($"{GameCatalog.Find(gameId)?.DisplayName ?? gameId}：{(config.Enabled ? "已启用" : "已禁用")}智能录制");
+        _ = RefreshSmartAsync();
+    }
+
+    public string AddCustomGame(string executable, string? displayName = null)
+    {
+        var cleaned = GameCatalog.ParseCustomEntry(executable);
+        if (cleaned is null) return "请输入游戏进程名，例如 mygame.exe";
+        var entry = string.IsNullOrWhiteSpace(displayName)
+            ? cleaned.Value.Executable
+            : $"{cleaned.Value.Executable}={displayName!.Trim()}";
+        if (Settings.CustomGameExecutables.Any(e => string.Equals(GameCatalog.ParseCustomEntry(e)?.Executable, cleaned.Value.Executable, StringComparison.OrdinalIgnoreCase)))
+        {
+            return "这个进程已经在列表里了。";
+        }
+
+        Settings.CustomGameExecutables.Add(entry);
+        var definition = GameCatalog.CustomDefinition(cleaned.Value.Executable, displayName);
+        Settings.GetGameConfig(definition.Id);
+        _services.SaveSettings();
+        OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(CustomGameExecutablesText));
+        RebuildGameCards();
+        _ = RefreshSmartAsync();
+        return $"已添加自定义游戏：{definition.DisplayName}（仅支持自动检测与手动/整局录制，不支持自动事件识别）";
+    }
+
+    public string RemoveCustomGame(string executable)
+    {
+        var parsed = GameCatalog.ParseCustomEntry(executable);
+        if (parsed is null) return "无效的进程名。";
+        var removed = Settings.CustomGameExecutables.RemoveAll(e =>
+            string.Equals(GameCatalog.ParseCustomEntry(e)?.Executable, parsed.Value.Executable, StringComparison.OrdinalIgnoreCase));
+        _services.SaveSettings();
+        OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(CustomGameExecutablesText));
+        RebuildGameCards();
+        _ = RefreshSmartAsync();
+        return removed > 0 ? "已移除自定义游戏。" : "列表里没有这个进程。";
+    }
+
+    /// <summary>手动书签：立刻保存一段带游戏/事件标记的片段。</summary>
+    public async Task<BookmarkResult> BookmarkNowAsync()
+    {
+        var engine = _services.Engine;
+        if (engine is null || !engine.IsRunning)
+        {
+            return new BookmarkResult(false, "请先开始捕获。");
+        }
+
+        var smart = _services.Smart;
+        var gameName = smart?.CurrentGame?.DisplayName;
+        var tag = new GameClipTag(string.IsNullOrWhiteSpace(gameName) ? "手动书签" : gameName!, "bookmark", "手动书签");
+        var title = $"{(string.IsNullOrWhiteSpace(gameName) ? "手动书签" : gameName)} 书签 {DateTime.Now:HHmmss}";
+        var outcome = await engine.SaveReplayAsync(title, tag);
+        if (outcome.Success && outcome.Clip is not null)
+        {
+            AfterSaved(outcome.Clip);
+            return new BookmarkResult(true, outcome.Clip.FileName);
+        }
+
+        return new BookmarkResult(false, outcome.Error ?? "保存失败。");
+    }
+
+
     public Task<bool> SaveSettingsAsync()
     {
         try
@@ -430,6 +822,7 @@ public sealed class MainViewModel : ObservableObject
                 _ = RestartCaptureAsync();
             }
 
+            _ = RefreshSmartAfterSettingsAsync();
             HotkeysChanged?.Invoke();
             return Task.FromResult(true);
         }
@@ -454,6 +847,38 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>设置保存后，让智能录制按新的总开关/端口/规则重新同步。</summary>
+    private async Task RefreshSmartAfterSettingsAsync()
+    {
+        _services.EnsureSmartService();
+        var smart = _services.Smart;
+        if (smart is null) return;
+
+        try
+        {
+            if (Settings.SmartRecordingEnabled && !smart.IsRunning)
+            {
+                var (ok, error) = await smart.StartAsync();
+                if (!ok) SmartErrorText = error ?? string.Empty;
+            }
+            else if (!Settings.SmartRecordingEnabled && smart.IsRunning)
+            {
+                await smart.StopAsync();
+            }
+            else if (smart.IsRunning)
+            {
+                await smart.RepairEventSourceAsync(reinstallConfig: true);
+            }
+
+            UpdateSmartFromService();
+            RefreshEvents();
+        }
+        catch (Exception ex)
+        {
+            _services.Logger.Error("智能录制", "按新设置同步智能录制失败", ex);
+        }
+    }
+
     public void ResetSettings()
     {
         var defaults = new AppSettings();
@@ -469,31 +894,55 @@ public sealed class MainViewModel : ObservableObject
 
     public void RaiseStaticProperties()
     {
+        OnPropertyChanged(nameof(WholeEstimateText));
+        RaiseStaticCore();
+    }
+
+    private void RaiseStaticCore()
+    {
         OnPropertyChanged(nameof(Settings));
         OnPropertyChanged(nameof(SaveFolderText));
         OnPropertyChanged(nameof(HotkeySaveText));
         OnPropertyChanged(nameof(HotkeyRecordText));
         OnPropertyChanged(nameof(AudioText));
         OnPropertyChanged(nameof(DataFolderText));
+        OnPropertyChanged(nameof(SmartToggleText));
+        OnPropertyChanged(nameof(BookmarkHotkeyText));
+        OnPropertyChanged(nameof(Cs2ConfigText));
     }
 
-    public bool SetHotkey(bool saveHotkey, HotkeyGesture gesture, out string? error)
+    public bool SetHotkey(HotkeySlot slot, HotkeyGesture gesture, out string? error)
     {
         error = null;
-        var other = saveHotkey ? Settings.ToggleRecordingHotkey : Settings.SaveHotkey;
-        if (string.Equals(other, gesture.ToString(), StringComparison.OrdinalIgnoreCase))
+        var text = gesture.ToString();
+        var others = new[]
         {
-            error = "两个快捷键不能相同。";
+            (Slot: HotkeySlot.Save, Value: Settings.SaveHotkey),
+            (Slot: HotkeySlot.Record, Value: Settings.ToggleRecordingHotkey),
+            (Slot: HotkeySlot.Bookmark, Value: Settings.BookmarkHotkey)
+        };
+
+        if (others.Any(o => o.Slot != slot && string.Equals(o.Value, text, StringComparison.OrdinalIgnoreCase)))
+        {
+            error = "三个快捷键不能相同。";
             return false;
         }
 
-        if (saveHotkey) Settings.SaveHotkey = gesture.ToString();
-        else Settings.ToggleRecordingHotkey = gesture.ToString();
+        switch (slot)
+        {
+            case HotkeySlot.Save: Settings.SaveHotkey = text; break;
+            case HotkeySlot.Record: Settings.ToggleRecordingHotkey = text; break;
+            default: Settings.BookmarkHotkey = text; break;
+        }
+
         _services.SaveSettings();
         RaiseStaticProperties();
         HotkeysChanged?.Invoke();
         return true;
     }
+
+    public bool SetHotkey(bool saveHotkey, HotkeyGesture gesture, out string? error) =>
+        SetHotkey(saveHotkey ? HotkeySlot.Save : HotkeySlot.Record, gesture, out error);
 
     public void CompleteFirstRun()
     {
@@ -629,6 +1078,7 @@ public sealed class MainViewModel : ObservableObject
     {
         try
         {
+            DetachSmart();
             if (_services.Engine is not null)
             {
                 _services.Engine.Changed -= OnEngineChanged;
@@ -736,4 +1186,15 @@ public sealed class MainViewModel : ObservableObject
         if (Settings.CaptureMicrophone) parts.Add($"麦克风 {Settings.MicrophoneVolume}%");
         return string.Join(" + ", parts);
     }
+}
+
+/// <summary>手动书签的结果。</summary>
+public sealed record BookmarkResult(bool Success, string Message);
+
+/// <summary>可配置的全局快捷键槽位。</summary>
+public enum HotkeySlot
+{
+    Save,
+    Record,
+    Bookmark
 }

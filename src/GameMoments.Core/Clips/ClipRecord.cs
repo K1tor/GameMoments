@@ -25,6 +25,15 @@ public sealed class ClipRecord
     /// <summary>是否来自“开始/停止录制”的完整录制，而不是即时回放。</summary>
     public bool ManualRecording { get; init; }
 
+    /// <summary>来源游戏名称（智能录制/事件剪辑才有值）。</summary>
+    public string? GameName { get; init; }
+
+    /// <summary>触发该片段的事件类型（见 <see cref="Gaming.GameEventKinds"/>）。</summary>
+    public string? EventKind { get; init; }
+
+    /// <summary>事件来源，例如 GSI / 手动快捷键。</summary>
+    public string? EventSource { get; init; }
+
     [JsonIgnore]
     public string ResolutionText => Width > 0 && Height > 0 ? $"{Width}×{Height}" : "—";
 
@@ -51,6 +60,21 @@ public sealed class ClipRecord
 
     [JsonIgnore]
     public string SourceText => ManualRecording ? "完整录制" : "即时回放";
+
+    /// <summary>游戏/事件标签，用于片段库展示。</summary>
+    [JsonIgnore]
+    public string GameTagText
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(GameName)) return string.Empty;
+            if (string.IsNullOrWhiteSpace(EventKind)) return GameName!;
+            return $"{GameName} · {Gaming.GameEventKinds.Label(EventKind!)}";
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasGameTag => !string.IsNullOrWhiteSpace(GameName);
 
     [JsonIgnore]
     public string AudioText => HasAudio ? (string.IsNullOrWhiteSpace(AudioSummary) ? "含音频" : AudioSummary) : "无音频";

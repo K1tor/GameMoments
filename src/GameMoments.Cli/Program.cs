@@ -30,6 +30,13 @@ internal static class Program
                 "clips" => Clips(options),
                 "capture" => await CaptureAsync(options),
                 "record" => await CaptureAsync(options, manual: true),
+                "detect" => GsiCommands.Detect(options),
+                "gsi-status" => GsiCommands.Status(options),
+                "gsi-install" => GsiCommands.Install(options),
+                "gsi-remove" => GsiCommands.Remove(options),
+                "gsi-serve" => GsiCommands.Serve(options),
+                "gsi-smoke" => await GsiCommands.SmokeAsync(options),
+                "smart-smoke" => await SmartSmoke.RunAsync(options),
                 "help" or "--help" or "-h" => Help(),
                 _ => Unknown(command),
             };
@@ -52,6 +59,21 @@ GameMoments 命令行工具
   GameMoments.Cli clips   [--data-dir PATH]
   GameMoments.Cli capture [选项]      即时回放保存测试
   GameMoments.Cli record  [选项]      完整录制测试
+  GameMoments.Cli detect  [--custom EXE] [--data-dir PATH]
+                                      真实扫描游戏进程并打印支持矩阵
+  GameMoments.Cli gsi-status  [--port N] [--target DIR] [--data-dir PATH]
+                                      查看 CS2 的 GSI 配置状态（真实路径）
+  GameMoments.Cli gsi-install [--port N] [--target DIR] [--data-dir PATH]
+                                      写入本程序专属的 CS2 GSI 配置文件（可逆）
+  GameMoments.Cli gsi-remove  [--target DIR] [--data-dir PATH]
+                                      删除本程序写入的 GSI 配置（不动其他文件）
+  （--target DIR 可指定自定义的 cfg 目录，默认走 Steam 库真实路径）
+  GameMoments.Cli gsi-serve   [--port N] [--seconds N] [--data-dir PATH]
+                                      启动真实事件源监听，等待游戏推送
+  GameMoments.Cli gsi-smoke   [--port N] [--data-dir PATH]
+  GameMoments.Cli smart-smoke [--port N] [--workdir PATH] [--hold SECONDS] [--data-dir PATH]
+                             全链路：假游戏进程触发检测 → 真实捕获 → 真实 HTTP 事件 → 自动保存片段
+                                      用真实 HTTP 服务器 + 合成报文验证事件链路
 
 capture / record 选项：
   --seconds N       启动后等待多少秒再触发保存（默认 replay+2）

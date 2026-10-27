@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private const int WmHotkey = 0x0312;
     private const int HotkeySaveId = 0x4A01;
     private const int HotkeyRecordId = 0x4A02;
+    private const int HotkeyBookmarkId = 0x4A03;
     private const int DwmwaUseImmersiveDarkMode = 20;
 
     private readonly AppServices _services;
@@ -101,6 +102,15 @@ public partial class MainWindow : Window
                 handled = true;
                 _ = Dispatcher.InvokeAsync(async () => await _viewModel.ToggleRecordAsync());
             }
+            else if (id == HotkeyBookmarkId)
+            {
+                handled = true;
+                _ = Dispatcher.InvokeAsync(async () =>
+                {
+                    var result = await _viewModel.BookmarkNowAsync();
+                    ShowSnack(result.Success ? $"已保存书签：{result.Message}" : result.Message);
+                });
+            }
         }
         return IntPtr.Zero;
     }
@@ -111,6 +121,7 @@ public partial class MainWindow : Window
         if (_hwnd == IntPtr.Zero) return;
         HotkeyRegistrar.Unregister(_hwnd, HotkeySaveId);
         HotkeyRegistrar.Unregister(_hwnd, HotkeyRecordId);
+        HotkeyRegistrar.Unregister(_hwnd, HotkeyBookmarkId);
 
         var errors = new System.Collections.Generic.List<string>();
         if (HotkeyGesture.TryParse(_services.Settings.SaveHotkey, out var save, out var saveError) && save is not null)
@@ -131,6 +142,15 @@ public partial class MainWindow : Window
             errors.Add("录制快捷键无效：" + recordError);
         }
 
+        if (HotkeyGesture.TryParse(_services.Settings.BookmarkHotkey, out var bookmark, out var bookmarkError) && bookmark is not null)
+        {
+            if (!HotkeyRegistrar.TryRegister(_hwnd, HotkeyBookmarkId, bookmark, out var error)) errors.Add(error ?? "书签快捷键注册失败。");
+        }
+        else
+        {
+            errors.Add("书签快捷键无效：" + bookmarkError);
+        }
+
         _viewModel.HotkeyErrorText = string.Join("  ", errors);
         if (errors.Count > 0)
         {
@@ -140,7 +160,7 @@ public partial class MainWindow : Window
         else
         {
             _services.Logger.Info("快捷键", "全局快捷键已注册",
-                $"{_services.Settings.SaveHotkey} / {_services.Settings.ToggleRecordingHotkey}");
+                $"{_services.Settings.SaveHotkey} / {_services.Settings.ToggleRecordingHotkey} / {_services.Settings.BookmarkHotkey}");
         }
     }
 
@@ -154,6 +174,7 @@ public partial class MainWindow : Window
     {
         switch (page)
         {
+            case "smart": NavSmart.IsChecked = true; break;
             case "library": NavLibrary.IsChecked = true; break;
             case "settings": NavSettings.IsChecked = true; break;
             case "logs": NavLogs.IsChecked = true; break;
@@ -172,6 +193,7 @@ public partial class MainWindow : Window
         {
             view = page switch
             {
+                "smart" => new SmartView(),
                 "library" => new LibraryView(),
                 "settings" => new SettingsView(),
                 "logs" => new LogsView(),
@@ -184,6 +206,7 @@ public partial class MainWindow : Window
         PageHost.Content = view;
         PageTitle.Text = page switch
         {
+            "smart" => "智能录制",
             "library" => "片段库",
             "settings" => "设置",
             "logs" => "日志与诊断",
@@ -192,6 +215,11 @@ public partial class MainWindow : Window
 
         if (page == "library") _viewModel.RefreshClips();
         if (page == "settings") _viewModel.RefreshDevices();
+        if (page == "smart")
+        {
+            _viewModel.UpdateSmartFromService();
+            _viewModel.RefreshEvents();
+        }
     }
 
     private async void SaveReplay_Click(object sender, RoutedEventArgs e) => await _viewModel.SaveReplayAsync();

@@ -33,6 +33,16 @@ public sealed class ZeroToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>布尔取反（用于「已处理」按钮置灰）。</summary>
+public sealed class InvertBooleanConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is not true;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>布尔取反后转可见性。</summary>
 public sealed class InverseBoolToVisibilityConverter : IValueConverter
 {

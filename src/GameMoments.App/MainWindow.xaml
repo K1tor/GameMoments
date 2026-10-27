@@ -39,6 +39,8 @@
 
                     <RadioButton x:Name="NavHome" Style="{StaticResource NavButton}" GroupName="Nav"
                                  Content="🏠   首页" Tag="home" IsChecked="True" Checked="Nav_Checked" />
+                    <RadioButton x:Name="NavSmart" Style="{StaticResource NavButton}" GroupName="Nav"
+                                 Content="⚡   智能录制" Tag="smart" Checked="Nav_Checked" />
                     <RadioButton x:Name="NavLibrary" Style="{StaticResource NavButton}" GroupName="Nav"
                                  Content="📚   片段库" Tag="library" Checked="Nav_Checked" />
                     <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" GroupName="Nav"

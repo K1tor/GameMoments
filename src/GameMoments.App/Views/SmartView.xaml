@@ -1,0 +1,344 @@
+<UserControl x:Class="GameMoments.App.Views.SmartView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:GameMoments.App.ViewModels"
+             xmlns:conv="clr-namespace:GameMoments.App.Converters"
+             xmlns:gaming="clr-namespace:GameMoments.Core.Gaming;assembly=GameMoments.Core"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:StringNotEmptyToVisibilityConverter x:Key="NotEmptyToVis" />
+        <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
+        <conv:InvertBooleanConverter x:Key="InvertBool" />
+        <DataTemplate x:Key="EventKindTemplate">
+            <CheckBox Content="{Binding Label}"
+                      IsChecked="{Binding Enabled, Mode=TwoWay}"
+                      Foreground="{StaticResource TextBrush}"
+                      Margin="0,0,16,8" />
+        </DataTemplate>
+        <DataTemplate x:Key="DetectedGameTemplate">
+            <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="6" Padding="10,8" Margin="0,0,0,8">
+                <StackPanel>
+                    <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding ProcessDisplay}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+        <StackPanel>
+
+            <!-- 总开关与状态 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="智能录制" Style="{StaticResource SectionTitle}" DockPanel.Dock="Left" />
+                        <Button x:Name="SmartToggleButton" Content="{Binding SmartToggleText}"
+                                Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right"
+                                Click="ToggleSmart_Click" />
+                    </DockPanel>
+                    <TextBlock Text="自动检测游戏进程，按游戏的事件规则从回放缓存中剪辑精彩时刻；所有事件只来自官方公开接口，不做注入、不读写游戏内存。"
+                               Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,6,0,12" />
+
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="运行状态" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding SmartStatusText}" Foreground="{StaticResource TextBrush}" />
+                    </Grid>
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="进程检测" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding SmartDetectionText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                    </Grid>
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="当前游戏" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding CurrentGameText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                    </Grid>
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="事件来源" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding SmartGsiText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                    </Grid>
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="整局录制" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding WholeRecordingText}" Foreground="{StaticResource MutedBrush}" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="磁盘占用" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding WholeEstimateText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="手动书签" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding BookmarkHotkeyText}" Foreground="{StaticResource MutedBrush}" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding SmartErrorText}" Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding SmartErrorText, Converter={StaticResource NotEmptyToVis}}" />
+
+                    <WrapPanel Margin="0,4,0,0">
+                        <Button Content="刷新检测" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="Refresh_Click" />
+                        <Button Content="修复事件源 / 重装 GSI 配置" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="Repair_Click" />
+                        <Button Content="停止整局录制" Style="{StaticResource DangerButton}" Margin="0,0,8,0"
+                                IsEnabled="{Binding CanStopWhole}" Click="StopWhole_Click" />
+                        <Button Content="立即保存书签" Style="{StaticResource GhostButton}" Click="Bookmark_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 检测到的游戏 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="当前检测到的游戏" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="每 2 秒扫描一次进程列表。没有出现在这里的游戏可以用下面的“自定义游戏”补充进程名。"
+                               Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,10" />
+                    <ItemsControl ItemsSource="{Binding DetectedGames}" ItemTemplate="{StaticResource DetectedGameTemplate}" />
+                    <TextBlock Text="当前没有检测到游戏。" Foreground="{StaticResource MutedBrush}"
+                               Visibility="{Binding DetectedGames.Count, Converter={StaticResource ZeroToVis}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 每游戏规则 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="按游戏的事件规则" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="捕获方式：仅回放缓存 / 事件剪辑 / 整局录制 / 两者同开。事件规则只对提供真实事件源的游戏生效；其他游戏只做自动检测与录制。"
+                               Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <ItemsControl ItemsSource="{Binding GameCards}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                      Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"
+                                                      VerticalAlignment="Center" DockPanel.Dock="Left" />
+                                            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource MutedBrush}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding SupportText}" Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8" />
+
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="录制方式" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                                            <ComboBox Grid.Column="1" Margin="8,0,16,0"
+                                                      ItemsSource="{Binding Modes}" DisplayMemberPath="Text"
+                                                      SelectedValuePath="Value" SelectedValue="{Binding Mode, Mode=TwoWay}"
+                                                      ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            <CheckBox Grid.Column="2" Content="{Binding SaveModeText}"
+                                                      IsChecked="{Binding AutoSaveEvents, Mode=TwoWay}"
+                                                      Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <WrapPanel Margin="0,0,0,8">
+                                            <StackPanel Margin="0,0,18,8">
+                                                <TextBlock Text="事件前保留" Style="{StaticResource Caption}" Margin="0,0,0,4" />
+                                                <ComboBox Width="104" ItemsSource="{Binding PreOptions}" DisplayMemberPath="Text"
+                                                          SelectedValuePath="Value" SelectedValue="{Binding PreSeconds, Mode=TwoWay}"
+                                                          ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,18,8">
+                                                <TextBlock Text="事件后继续" Style="{StaticResource Caption}" Margin="0,0,0,4" />
+                                                <ComboBox Width="104" ItemsSource="{Binding PostOptions}" DisplayMemberPath="Text"
+                                                          SelectedValuePath="Value" SelectedValue="{Binding PostSeconds, Mode=TwoWay}"
+                                                          ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,18,8">
+                                                <TextBlock Text="冷却" Style="{StaticResource Caption}" Margin="0,0,0,4" />
+                                                <ComboBox Width="104" ItemsSource="{Binding CooldownOptions}" DisplayMemberPath="Text"
+                                                          SelectedValuePath="Value" SelectedValue="{Binding CooldownSeconds, Mode=TwoWay}"
+                                                          ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,18,8">
+                                                <TextBlock Text="合并窗口" Style="{StaticResource Caption}" Margin="0,0,0,4" />
+                                                <ComboBox Width="104" ItemsSource="{Binding MergeOptions}" DisplayMemberPath="Text"
+                                                          SelectedValuePath="Value" SelectedValue="{Binding MergeWindowSeconds, Mode=TwoWay}"
+                                                          ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,18,8">
+                                                <TextBlock Text="回放缓存" Style="{StaticResource Caption}" Margin="0,0,0,4" />
+                                                <ComboBox Width="104" ItemsSource="{Binding ReplayOptions}" DisplayMemberPath="Text"
+                                                          SelectedValuePath="Value" SelectedValue="{Binding ReplaySeconds, Mode=TwoWay}"
+                                                          ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,18,8">
+                                                <TextBlock Text="最低置信度" Style="{StaticResource Caption}" Margin="0,0,0,4" />
+                                                <ComboBox Width="130" ItemsSource="{Binding ConfidenceOptions}" DisplayMemberPath="Text"
+                                                          SelectedValuePath="Value" SelectedValue="{Binding MinConfidence, Mode=TwoWay}"
+                                                          ItemTemplate="{StaticResource OptionItemTemplate}" />
+                                            </StackPanel>
+                                        </WrapPanel>
+
+                                        <TextBlock Text="事件类型" Style="{StaticResource Caption}" Margin="0,0,0,6"
+                                                   Visibility="{Binding SupportsAutomaticEvents, Converter={StaticResource BoolToVis}}" />
+                                        <ItemsControl ItemsSource="{Binding EventKinds}" ItemTemplate="{StaticResource EventKindTemplate}"
+                                                      Visibility="{Binding SupportsAutomaticEvents, Converter={StaticResource BoolToVis}}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+
+                                        <TextBlock Text="{Binding Notes}" Foreground="{StaticResource MutedBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- 最近事件 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="最近事件与保存结果" Style="{StaticResource SectionTitle}" DockPanel.Dock="Left" />
+                        <Button Content="清空列表" Style="{StaticResource GhostButton}" HorizontalAlignment="Right"
+                                Click="ClearEvents_Click" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding EventCountText}" Style="{StaticResource Hint}" Margin="0,4,0,10" />
+
+                    <ItemsControl ItemsSource="{Binding RecentEvents}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock Text="{Binding TimeText}" Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding KindLabel}" Foreground="{StaticResource TextBrush}"
+                                                       FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding OutcomeText}" Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="12" VerticalAlignment="Center" DockPanel.Dock="Right" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Message}" Foreground="{StaticResource MutedBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                                        <TextBlock Text="{Binding FeedbackText}" Foreground="{StaticResource AmberBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,2,0,0" />
+                                        <WrapPanel Margin="0,6,0,0">
+                                            <Button Content="从缓存补存" Style="{StaticResource GhostButton}" Margin="0,0,8,0"
+                                                    Tag="{Binding}" Click="SaveEvent_Click"
+                                                    IsEnabled="{Binding CanSaveFromCache}" />
+                                            <Button Content="打开片段" Style="{StaticResource GhostButton}" Margin="0,0,8,0"
+                                                    Tag="{Binding}" Click="OpenEventClip_Click"
+                                                    IsEnabled="{Binding HasClip}" />
+                                            <Button Content="标记误触发" Style="{StaticResource GhostButton}" Margin="0,0,8,0"
+                                                    Tag="{Binding}" Click="FalsePositive_Click"
+                                                    IsEnabled="{Binding FalsePositive, Converter={StaticResource InvertBool}}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="还没有收到任何事件。开启智能录制并进入游戏对局后，这里会显示每次自动保存/书签/忽略的原因。"
+                               Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding RecentEvents.Count, Converter={StaticResource ZeroToVis}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 自定义游戏 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="自定义游戏" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="填进程名（如 mygame.exe）即可让本程序在它启动时自动检测并开始录制。自定义游戏没有真实事件源，只支持自动检测与手动/整局录制。"
+                               Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,10" />
+                    <DockPanel Margin="0,0,0,8">
+                        <Button Content="添加" Style="{StaticResource GhostButton}" DockPanel.Dock="Right" Margin="8,0,0,0" Click="AddCustom_Click" />
+                        <TextBox x:Name="CustomGameBox" Style="{StaticResource {x:Type TextBox}}" Padding="8,6"
+                                 ToolTip="进程名，例如 mygame.exe" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding CustomGameExecutablesText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Settings.CustomGameExecutables}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,0,0,4">
+                                    <Button Content="移除" Style="{StaticResource GhostButton}" DockPanel.Dock="Right" Tag="{Binding}" Click="RemoveCustom_Click" />
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- CS2 事件源说明 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="CS2 事件源（官方 Game State Integration）" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="本程序只往游戏的 cfg 目录写入一个独立文件 gamestate_integration_gamemoments.cfg，不修改游戏文件、不覆盖其他软件的配置；删除该文件即可完全还原。配置需要重启 CS2 后生效。"
+                               Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="配置状态" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Cs2ConfigText}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="配置文件" Style="{StaticResource FieldLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding GsiConfigPathText}" Foreground="{StaticResource MutedBrush}"
+                                   TextWrapping="Wrap" FontSize="12" />
+                    </Grid>
+                    <WrapPanel>
+                        <Button Content="打开配置目录" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="OpenGsiPath_Click" />
+                        <Button Content="卸载 GSI 配置" Style="{StaticResource DangerButton}" Margin="0,0,8,0" Click="UninstallGsi_Click" />
+                    </WrapPanel>
+                    <TextBlock x:Name="GsiStatusText" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- 真实可用状态说明 -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="特性说明与限制" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="· 事件源优先级：官方 API / 官方状态集成 &gt; 官方公开日志 &gt; 回放与插件 &gt; 画面识别；音频只作为辅助信号。&#10;· 本程序不做 DLL 注入、不读写游戏内存、不绕过任何反作弊。&#10;· 只有接通真实事件源的游戏才会自动识别并剪辑事件；其他游戏会在界面上明确标注“支持自动检测、手动/整局录制，不支持自动事件识别”。&#10;· 模拟事件仅用于单元测试，绝不会被当作真实游戏数据展示。" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

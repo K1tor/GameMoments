@@ -83,8 +83,49 @@ public sealed class AppSettings
     /// <summary>缓存分段占用的磁盘上限（GB）。</summary>
     public int MaxCacheSizeGb { get; set; } = 20;
 
+    // ---- 智能录制 ----
+
+    /// <summary>智能录制总开关：自动检测游戏并按其配置启动捕获/事件识别。</summary>
+    public bool SmartRecordingEnabled { get; set; }
+
+    /// <summary>本机游戏状态推送端口（GSI 等事件源），实际端口被占用时会自动顺延。</summary>
+    public int SmartGsiPort { get; set; } = 48123;
+
+    /// <summary>按游戏的智能录制配置，键为游戏 id（自定义项以 <see cref="Gaming.GameCatalog.CustomGamePrefix"/> 开头）。</summary>
+    public Dictionary<string, Gaming.GameSettings> GameConfigs { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>用户自定义的游戏可执行文件名列表，支持 "game.exe" 或 "game.exe=显示名"。</summary>
+    public List<string> CustomGameExecutables { get; set; } = new();
+
+    /// <summary>事件书签快捷键（识别到事件但只加书签，不立即剪辑）。</summary>
+    public string BookmarkHotkey { get; set; } = "Ctrl+Alt+F8";
+
+    /// <summary>自动为支持的游戏安装事件源配置（例如 CS2 的 GSI cfg）。</summary>
+    public bool InstallGsiConfig { get; set; } = true;
+
+    /// <summary>整局自动录制的单文件时长上限（分钟），0 表示不限制。</summary>
+    public int WholeRecordingMinutes { get; set; }
+
+    /// <summary>检测到游戏退出后，延迟多少秒结束整局录制。</summary>
+    public int WholeRecordingStopDelaySeconds { get; set; } = 5;
+
+    /// <summary>最近事件列表保留条数。</summary>
+    public int MaxEventHistory { get; set; } = 50;
+
     [JsonIgnore]
     public int FpsOrDefault => Fps == 30 ? 30 : 60;
+
+    /// <summary>读取指定游戏的配置，缺失时按默认值创建并存入。</summary>
+    public Gaming.GameSettings GetGameConfig(string gameId)
+    {
+        GameConfigs ??= new Dictionary<string, Gaming.GameSettings>(StringComparer.OrdinalIgnoreCase);
+        if (GameConfigs.TryGetValue(gameId, out var existing) && existing is not null) return existing;
+        var created = new Gaming.GameSettings();
+        created.EnsureEventKinds(Gaming.GameEventKinds.UserConfigurable);
+        GameConfigs[gameId] = created;
+        return created;
+    }
 
     /// <summary>修正非法值并返回面向用户的警告列表。</summary>
     public List<string> Normalize(string fallbackSaveFolder)
@@ -105,6 +146,13 @@ public sealed class AppSettings
         MaxQueuedSaves = Math.Clamp(MaxQueuedSaves, 1, 10);
         MaxCacheSizeGb = Math.Clamp(MaxCacheSizeGb, 5, 200);
         LogRetentionDays = Math.Clamp(LogRetentionDays, 1, 90);
+        SmartGsiPort = Math.Clamp(SmartGsiPort, 1024, 65535);
+        WholeRecordingMinutes = Math.Clamp(WholeRecordingMinutes, 0, 600);
+        WholeRecordingStopDelaySeconds = Math.Clamp(WholeRecordingStopDelaySeconds, 0, 120);
+        MaxEventHistory = Math.Clamp(MaxEventHistory, 10, 500);
+
+        NormalizeGameConfigs(warnings);
+        NormalizeCustomGames(warnings);
 
         var folder = Platform.AppPaths.Normalize(SaveFolder);
         if (folder is null)
@@ -144,6 +192,19 @@ public sealed class AppSettings
             warnings.Add("保存回放与开始/停止录制使用了相同快捷键，注册时只会有一个生效，请修改。");
         }
 
+        if (!HotkeyGesture.TryParse(BookmarkHotkey, out _, out var bookmarkError))
+        {
+            warnings.Add($"书签快捷键无效（{bookmarkError}），已重置为 Ctrl+Alt+F8。");
+            BookmarkHotkey = "Ctrl+Alt+F8";
+        }
+        if (new[] { SaveHotkey, ToggleRecordingHotkey, BookmarkHotkey }
+            .Select(h => h.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count() < 3)
+        {
+            warnings.Add("三个快捷键存在重复，注册时只有第一个生效，请修改。");
+        }
+
         if (!string.IsNullOrWhiteSpace(SystemAudioDeviceId) && SystemAudioDeviceId.Trim().Length == 0)
         {
             SystemAudioDeviceId = null;
@@ -162,7 +223,74 @@ public sealed class AppSettings
         return warnings;
     }
 
-    public AppSettings Clone() => (AppSettings)MemberwiseClone();
+    public AppSettings Clone()
+    {
+        var clone = (AppSettings)MemberwiseClone();
+        clone.GameConfigs = new Dictionary<string, Gaming.GameSettings>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in GameConfigs ?? new Dictionary<string, Gaming.GameSettings>())
+        {
+            if (pair.Value is not null) clone.GameConfigs[pair.Key] = pair.Value.Clone();
+        }
+
+        clone.CustomGameExecutables = new List<string>(CustomGameExecutables ?? new List<string>());
+        return clone;
+    }
+
+    private void NormalizeGameConfigs(List<string> warnings)
+    {
+        GameConfigs ??= new Dictionary<string, Gaming.GameSettings>(StringComparer.OrdinalIgnoreCase);
+        var cleaned = new Dictionary<string, Gaming.GameSettings>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in GameConfigs)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null) continue;
+            var id = pair.Key.Trim();
+            var config = pair.Value;
+            var configWarnings = config.Normalize(id);
+            warnings.AddRange(configWarnings);
+            cleaned[id] = config;
+        }
+
+        GameConfigs = cleaned;
+
+        // 内置游戏补齐默认配置，便于界面直接展示。
+        foreach (var definition in Gaming.GameCatalog.BuiltIn)
+        {
+            if (GameConfigs.ContainsKey(definition.Id)) continue;
+            var config = new Gaming.GameSettings();
+            config.EnsureEventKinds(Gaming.GameEventKinds.UserConfigurable);
+            GameConfigs[definition.Id] = config;
+        }
+    }
+
+    private void NormalizeCustomGames(List<string> warnings)
+    {
+        CustomGameExecutables ??= new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cleaned = new List<string>();
+        foreach (var entry in CustomGameExecutables)
+        {
+            if (string.IsNullOrWhiteSpace(entry)) continue;
+            var parsed = Gaming.GameCatalog.ParseCustomEntry(entry);
+            if (parsed is null)
+            {
+                warnings.Add($"自定义游戏项“{entry}”无法识别，已忽略。");
+                continue;
+            }
+            var (executable, displayName) = parsed.Value;
+            if (!seen.Add(executable)) continue;
+            var canonical = executable + ".exe";
+            cleaned.Add(displayName is null ? canonical : $"{canonical}={displayName}");
+            GetGameConfig(Gaming.GameCatalog.CustomDefinition(executable, displayName).Id);
+        }
+
+        if (cleaned.Count > 50)
+        {
+            warnings.Add("自定义游戏项超过 50 个，多余的已忽略。");
+            cleaned = cleaned.Take(50).ToList();
+        }
+
+        CustomGameExecutables = cleaned;
+    }
 
     private static int Nearest(int value, int[] allowed)
     {
